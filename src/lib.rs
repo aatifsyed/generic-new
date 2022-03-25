@@ -3,7 +3,13 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, DataStruct, DeriveInput, ExprClosure, Ident, Type};
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    punctuated::Punctuated,
+    spanned::Spanned,
+    DataStruct, DeriveInput, Expr, Ident, Token, Type,
+};
 
 #[derive(Debug, Clone)]
 struct FieldInfo {
@@ -12,6 +18,37 @@ struct FieldInfo {
     struct_name: Option<Ident>,
     transform: TokenStream2,
 }
+
+#[derive(Debug, Clone)]
+enum GenericNewAttr {
+    InputType(Type),
+    Transform(Expr),
+}
+
+impl Parse for GenericNewAttr {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let name: Ident = input.parse()?;
+        let _: Token![=] = input.parse()?;
+        match name.to_string().as_str() {
+            "input_type" => Ok(GenericNewAttr::InputType(input.parse()?)),
+            "transform" => Ok(GenericNewAttr::Transform(input.parse()?)),
+            _ => abort!(
+                input.span(),
+                "Unsupported attribute. Did you mean 'input_type' or 'transform'?"
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct GenericNewAttrs(Punctuated<GenericNewAttr, Token![,]>);
+
+impl Parse for GenericNewAttrs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(Self(input.parse_terminated(GenericNewAttr::parse)?))
+    }
+}
+
 impl FieldInfo {
     fn input(&self) -> TokenStream2 {
         let input_name = self.input_name.clone();
@@ -40,6 +77,25 @@ fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldInfo> {
         .enumerate()
         .map(|(n, field)| {
             let span = field.span();
+            let attrs: Vec<_> = field
+                .attrs
+                .iter()
+                .filter(|attr| {
+                    attr.path
+                        .segments
+                        .first()
+                        .map(|segment| segment.ident.to_string().as_str() == "generic_new")
+                        .unwrap_or(false)
+                })
+                .map(|attr| match attr.parse_args::<GenericNewAttrs>() {
+                    Ok(parsed) => parsed.0,
+                    Err(e) => abort!(attr, "Couldn't parse attributes: {}", e),
+                })
+                .flatten()
+                .collect();
+
+            debug!("{attrs:?}");
+
             let struct_name = field.clone().ident;
             FieldInfo {
                 input_type: field.ty,
@@ -58,7 +114,6 @@ fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldInfo> {
 pub fn derive_generic_new(input: TokenStream) -> TokenStream {
     pretty_env_logger::try_init().ok();
     let derive_input = parse_macro_input!(input as DeriveInput);
-    debug!("{derive_input:#?}");
     let user_ident = derive_input.ident.clone();
 
     match derive_input.data {

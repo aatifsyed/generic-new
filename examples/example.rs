@@ -1,8 +1,10 @@
 use generic_new::GenericNew;
+use derive_more::Deref;
 
-#[derive(GenericNew)]
+#[derive(GenericNew, Deref)]
 struct Foo {
-    #[generic_new("foo")]
+    #[deref]
+    #[generic_new(input_type = str, transform = |id| id )]
     food: Vec<usize>,
 }
 
