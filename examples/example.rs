@@ -2,6 +2,7 @@ use generic_new::GenericNew;
 
 #[derive(GenericNew)]
 struct Foo {
+    #[generic_new("foo")]
     food: Vec<usize>,
 }
 
