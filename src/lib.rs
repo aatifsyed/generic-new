@@ -1,15 +1,17 @@
+use derive_syn_parse::Parse;
 use log::debug;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
+use single::Single;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
-    punctuated::Punctuated,
     spanned::Spanned,
     DataStruct, DeriveInput, Expr, Ident, Token, Type,
 };
+use smart_default::SmartDefault;
 
 #[derive(Debug, Clone)]
 struct FieldInfo {
@@ -19,34 +21,64 @@ struct FieldInfo {
     transform: TokenStream2,
 }
 
-#[derive(Debug, Clone)]
-enum GenericNewAttr {
-    InputType(Type),
-    Transform(Expr),
+#[derive(Debug, SmartDefault)]
+enum UserConfig {
+    #[default]
+    None,
+    Ignore,
+    Custom(Type, Expr)
 }
 
-impl Parse for GenericNewAttr {
+impl Parse for UserConfig {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let name: Ident = input.parse()?;
-        let _: Token![=] = input.parse()?;
-        match name.to_string().as_str() {
-            "input_type" => Ok(GenericNewAttr::InputType(input.parse()?)),
-            "transform" => Ok(GenericNewAttr::Transform(input.parse()?)),
-            _ => abort!(
-                input.span(),
-                "Unsupported attribute. Did you mean 'input_type' or 'transform'?"
-            ),
+        let p = input.parse_terminated::<_, Token![,]>(UserAttribute::parse)?;
+        let mut ignore = false;
+        let mut input_type = None;
+        let mut converter = None;
+        for user_attribute in p {
+            match user_attribute {
+                UserAttribute::Ignore(_) => match ignore {
+                    true => abort!(input.span(), "Cannot specify `ignore` more than once"),
+                    false => ignore = true,
+                },
+                UserAttribute::InputType(_, _, t) => {
+                    if let Some(_) = input_type.replace(t) {
+                        abort!(input.span(), "Can't specify `input_type` more than once")
+                    }
+                }
+                UserAttribute::Converter(_, _, e) => {
+                    if let Some(_) = converter.replace(e) {
+                        abort!(input.span(), "Can't specify `converter` more than once")
+                    }
+                }
+            }
+        }
+        match (ignore, input_type, converter ) {
+            (false, None, None) => Ok(UserConfig::None),
+            (true, None, None) => Ok(UserConfig::Ignore),
+            (true, _, _) => abort!(input.span(), "`ignore` is mutually exclusive with other options"),
+            (false, Some(t), Some(e)) => Ok(UserConfig::Custom(t, e)),
+            (false, _, _) => abort!(input.span(), "Must provide both `ty` and `converter`")
+
         }
     }
 }
 
-#[derive(Debug, Clone)]
-struct GenericNewAttrs(Punctuated<GenericNewAttr, Token![,]>);
-
-impl Parse for GenericNewAttrs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self(input.parse_terminated(GenericNewAttr::parse)?))
+fn ident_is(s: &str) -> impl Fn(ParseStream) -> bool + '_ {
+    move |parse_stream| match parse_stream.parse::<Ident>() {
+        Ok(ident) => ident.to_string().as_str() == s,
+        Err(_) => false,
     }
+}
+
+#[derive(Debug, Parse)]
+enum UserAttribute {
+    #[peek_with(ident_is("ignore"), name = "ignore")]
+    Ignore(Ident),
+    #[peek_with(ident_is("ty"), name = "ty")]
+    InputType(Ident, Token![=], Type),
+    #[peek_with(ident_is("converter"), name = "converter")]
+    Converter(Ident, Token![=], Expr),
 }
 
 impl FieldInfo {
@@ -76,8 +108,7 @@ fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldInfo> {
         .into_iter()
         .enumerate()
         .map(|(n, field)| {
-            let span = field.span();
-            let attrs: Vec<_> = field
+            let attr = match field
                 .attrs
                 .iter()
                 .filter(|attr| {
@@ -87,14 +118,27 @@ fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldInfo> {
                         .map(|segment| segment.ident.to_string().as_str() == "generic_new")
                         .unwrap_or(false)
                 })
-                .map(|attr| match attr.parse_args::<GenericNewAttrs>() {
-                    Ok(parsed) => parsed.0,
-                    Err(e) => abort!(attr, "Couldn't parse attributes: {}", e),
-                })
-                .flatten()
-                .collect();
+                .single()
+            {
+                Ok(a) => Some(a),
+                Err(e) => match e {
+                    single::Error::NoElements => None,
+                    single::Error::MultipleElements => {
+                        abort!(field.span(), "Can't specify `generic_new` more than once")
+                    }
+                },
+            };
 
-            debug!("{attrs:?}");
+            debug!("{attr:?}");
+
+            let config = attr.map_or(UserConfig::default(), |attr|{
+                match attr.parse_args() {
+                    Ok(o) => o,
+                    Err(e)=> abort!(field.span(), "Couldn't parse attributes"; note = e)
+                }
+            });
+
+            let span = field.span();
 
             let struct_name = field.clone().ident;
             FieldInfo {
