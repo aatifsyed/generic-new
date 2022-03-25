@@ -3,8 +3,8 @@ use derive_more::Deref;
 
 #[derive(GenericNew, Deref)]
 struct Foo {
-    #[deref]
-    #[generic_new(input_type = str, transform = |id| id )]
+    // #[deref]
+    #[generic_new( ignore )]
     food: Vec<usize>,
 }
 
