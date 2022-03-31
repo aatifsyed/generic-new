@@ -93,6 +93,16 @@ fn magic_field_config(field: Field, input_name: Ident) -> Option<FieldConfig> {
                     _ => None,
                 }
             }
+            // PathBuf -> impl AsRef<Path>
+            [PathSegment { ident, .. }] if ident.to_string() == "PathBuf" => Some(FieldConfig {
+                input_type: syn::parse2(quote!(impl ::std::convert::AsRef<::std::path::Path>))
+                    .unwrap(),
+                input_name,
+                struct_name: field.ident,
+                transform: quote!(|s| ::std::path::PathBuf::from(::std::convert::AsRef::<
+                    ::std::path::Path,
+                >::as_ref(&s))),
+            }),
             _ => None,
         },
         _ => None,
