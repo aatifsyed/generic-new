@@ -1,4 +1,22 @@
-use field::{make_field_infos, FieldConfig};
+//! <div align="center">
+//! [![crates-io](https://img.shields.io/crates/v/generic-new.svg)](https://crates.io/crates/generic-new)
+//! [![docs-rs](https://docs.rs/generic-new/badge.svg)](https://docs.rs/generic-new)
+//! [![github](https://img.shields.io/static/v1?label=&message=github&color=grey&logo=github)](https://github.com/aatifsyed/generic-new)
+//! </div>
+//! ```rust
+//! use generic_new::GenericNew;
+//!
+//! #[derive(GenericNew)]
+//! struct Foo {
+//!     bar: String
+//! }
+//!
+//! # fn _make_foo() {
+//! Foo::new("hello");
+//! # }
+//! ```
+
+use field::{make_field_configs, FieldConfig};
 use proc_macro::TokenStream;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
@@ -16,7 +34,7 @@ pub fn derive_generic_new(input: TokenStream) -> TokenStream {
 
     match derive_input.data {
         syn::Data::Struct(ref user_struct) => {
-            let field_infos = make_field_infos(user_struct);
+            let field_infos = make_field_configs(user_struct);
             let inputs = field_infos.iter().map(FieldConfig::input);
             let transforms = field_infos.iter().map(FieldConfig::transform);
             let outputs = field_infos.iter().map(FieldConfig::output);
@@ -41,5 +59,13 @@ pub fn derive_generic_new(input: TokenStream) -> TokenStream {
         }
         syn::Data::Enum(_) => abort!(derive_input, "Enums are not yet supported"),
         syn::Data::Union(_) => abort!(derive_input, "Unions are not supported"),
+    }
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ui() {
+        let t = trybuild::TestCases::new();
+        t.pass("trybuild/*.rs")
     }
 }

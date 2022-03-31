@@ -1,5 +1,4 @@
 use proc_macro_error::abort;
-use smart_default::SmartDefault;
 use syn::{
     parse::{Parse, ParseStream},
     Expr, Token, Type,
@@ -8,10 +7,8 @@ use syn::{
 use crate::attributes::UserAttribute;
 
 /// Config added by the user
-#[derive(Debug, SmartDefault)]
+#[derive(Debug)]
 pub enum UserConfig {
-    #[default]
-    None,
     Ignore,
     Custom(Type, Expr),
 }
@@ -41,7 +38,7 @@ impl Parse for UserConfig {
             }
         }
         match (ignore, input_type, converter) {
-            (false, None, None) => Ok(UserConfig::None),
+            (false, None, None) => abort!(input.span(), "No attributes found"),
             (true, None, None) => Ok(UserConfig::Ignore),
             (true, _, _) => abort!(
                 input.span(),
@@ -66,12 +63,10 @@ mod tests {
         Ok(())
     }
 
+    #[should_panic]
     #[test]
-    fn parse_nothing() -> anyhow::Result<()> {
-        let config = syn::parse2::<UserConfig>(quote!())?;
-        println!("{config:?}");
-        assert!(matches!(config, UserConfig::None));
-        Ok(())
+    fn parse_nothing() {
+        let _ = syn::parse2::<UserConfig>(quote!());
     }
 
     #[test]
