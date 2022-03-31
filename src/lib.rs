@@ -14,7 +14,7 @@ use syn::{
 use smart_default::SmartDefault;
 
 #[derive(Debug, Clone)]
-struct FieldInfo {
+struct FieldConfig {
     input_type: Type,
     input_name: Ident,
     struct_name: Option<Ident>,
@@ -81,7 +81,7 @@ enum UserAttribute {
     Converter(Ident, Token![=], Expr),
 }
 
-impl FieldInfo {
+impl FieldConfig {
     fn input(&self) -> TokenStream2 {
         let input_name = self.input_name.clone();
         let input_type = self.input_type.clone();
@@ -101,7 +101,7 @@ impl FieldInfo {
     }
 }
 
-fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldInfo> {
+fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldConfig> {
     data_struct
         .fields
         .clone()
@@ -141,7 +141,7 @@ fn make_field_infos(data_struct: &DataStruct) -> Vec<FieldInfo> {
             let span = field.span();
 
             let struct_name = field.clone().ident;
-            FieldInfo {
+            FieldConfig {
                 input_type: field.ty,
                 input_name: field
                     .ident
@@ -163,9 +163,9 @@ pub fn derive_generic_new(input: TokenStream) -> TokenStream {
     match derive_input.data {
         syn::Data::Struct(ref user_struct) => {
             let field_infos = make_field_infos(user_struct);
-            let inputs = field_infos.iter().map(FieldInfo::input);
-            let transforms = field_infos.iter().map(FieldInfo::transform);
-            let outputs = field_infos.iter().map(FieldInfo::output);
+            let inputs = field_infos.iter().map(FieldConfig::input);
+            let transforms = field_infos.iter().map(FieldConfig::transform);
+            let outputs = field_infos.iter().map(FieldConfig::output);
 
             let constructor = match user_struct.fields {
                 syn::Fields::Named(_) => quote!(Self {#(#outputs,)*}),
