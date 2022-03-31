@@ -85,6 +85,7 @@ mod tests {
     #[test]
     fn ui() {
         let t = trybuild::TestCases::new();
-        t.pass("trybuild/*.rs")
+        t.pass("trybuild/pass/*.rs");
+        t.compile_fail("trybuild/fail/*.rs");
     }
 }

@@ -1,0 +1,14 @@
+error: Can't specify `input_type` more than once
+ --> trybuild/fail/double_ty.rs:6:41
+  |
+6 |     #[generic_new(ty = usize, ty = usize)]
+  |                                         ^
+
+error[E0599]: no function or associated item named `new` found for struct `Foo` in the current scope
+  --> trybuild/fail/double_ty.rs:14:10
+   |
+5  | struct Foo {
+   | ---------- function or associated item `new` not found for this
+...
+14 |     Foo::new(1usize);
+   |          ^^^ function or associated item not found in `Foo`

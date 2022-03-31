@@ -1,0 +1,14 @@
+error: Cannot specify `ignore` more than once
+ --> trybuild/fail/double_ignore.rs:6:33
+  |
+6 |     #[generic_new(ignore, ignore)]
+  |                                 ^
+
+error[E0599]: no function or associated item named `new` found for struct `Foo` in the current scope
+  --> trybuild/fail/double_ignore.rs:14:10
+   |
+5  | struct Foo {
+   | ---------- function or associated item `new` not found for this
+...
+14 |     Foo::new(1usize);
+   |          ^^^ function or associated item not found in `Foo`

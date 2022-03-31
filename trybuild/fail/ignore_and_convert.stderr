@@ -1,0 +1,14 @@
+error: `ignore` is mutually exclusive with other options
+ --> trybuild/fail/ignore_and_convert.rs:6:78
+  |
+6 |     #[generic_new(ignore, ty = impl Into<usize>, converter = |u|Into::into(u))]
+  |                                                                              ^
+
+error[E0599]: no function or associated item named `new` found for struct `Foo` in the current scope
+  --> trybuild/fail/ignore_and_convert.rs:14:10
+   |
+5  | struct Foo {
+   | ---------- function or associated item `new` not found for this
+...
+14 |     Foo::new(1usize);
+   |          ^^^ function or associated item not found in `Foo`
