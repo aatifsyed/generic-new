@@ -8,7 +8,7 @@
 
 </div>
 
-The `GenericNew` derive macro will generate an ergonomic constructor which contains shortcuts for certain types.
+A derive macro which generates an ergonomic constructor with shortcuts for certain types.
 
 ```rust
 use generic_new::GenericNew;
@@ -33,3 +33,5 @@ Foo::new(
 );
 
 ```
+
+License: MIT
