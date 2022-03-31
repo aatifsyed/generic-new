@@ -1,10 +1,10 @@
-use generic_new::GenericNew;
 use derive_more::Deref;
+use generic_new::GenericNew;
 
 #[derive(GenericNew, Deref)]
 struct Foo {
     // #[deref]
-    #[generic_new( ignore )]
+    #[generic_new(ignore)]
     food: Vec<usize>,
 }
 
