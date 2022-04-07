@@ -69,14 +69,68 @@ fn magic_field_config(field: Field, input_name: Ident) -> Option<FieldConfig> {
                     ::std::primitive::str,
                 >::as_ref(&s))),
             }),
-            // Vec<T> -> impl IntoIterator<Item = T>
+            // Vec<T> -> impl IntoIterator<Item = ...>
             [PathSegment {
                 ident,
                 arguments:
                     PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }),
             }] if ident.to_string() == "Vec" => {
                 match args.into_iter().collect::<Vec<_>>().as_slice() {
-                    // Single concrete type argument
+                    // Vec<String> -> impl IntoIterator<Item = impl AsRef<str>>
+                    [GenericArgument::Type(Type::Path(TypePath {
+                        qself: None,
+                        path:
+                            syn::Path {
+                                leading_colon: None,
+                                segments,
+                            },
+                    }))] if simple_segment(segments, "String") => Some(FieldConfig {
+                        input_type: syn::parse2(quote!(
+                            impl ::std::iter::IntoIterator<Item = impl AsRef<::std::primitive::str>>
+                        ))
+                        .unwrap(),
+                        input_name,
+                        struct_name: field.ident,
+                        transform: quote!(|i| {
+                            let mut v = std::vec::Vec::new();
+                            for item in i {
+                                v.push(::std::string::String::from(::std::convert::AsRef::<
+                                    ::std::primitive::str,
+                                >::as_ref(
+                                    &item
+                                )))
+                            }
+                            v
+                        }),
+                    }),
+                    // Vec<PathBuf> -> impl IntoIterator<Item = impl AsRef<Path>>
+                    [GenericArgument::Type(Type::Path(TypePath {
+                        qself: None,
+                        path:
+                            syn::Path {
+                                leading_colon: None,
+                                segments,
+                            },
+                    }))] if simple_segment(segments, "PathBuf") => Some(FieldConfig {
+                        input_type: syn::parse2(quote!(
+                            impl ::std::iter::IntoIterator<Item = impl AsRef<::std::path::Path>>
+                        ))
+                        .unwrap(),
+                        input_name,
+                        struct_name: field.ident,
+                        transform: quote!(|i| {
+                            let mut v = std::vec::Vec::new();
+                            for item in i {
+                                v.push(::std::path::PathBuf::from(::std::convert::AsRef::<
+                                    ::std::path::Path,
+                                >::as_ref(
+                                    &item
+                                )))
+                            }
+                            v
+                        }),
+                    }),
+                    // Vec<T> -> impl IntoIterator<Item = T>
                     [GenericArgument::Type(ty)] => Some(FieldConfig {
                         input_type: syn::parse2(quote!(impl ::std::iter::IntoIterator<Item = #ty>))
                             .unwrap(),
@@ -106,6 +160,19 @@ fn magic_field_config(field: Field, input_name: Ident) -> Option<FieldConfig> {
             _ => None,
         },
         _ => None,
+    }
+}
+
+fn simple_segment<'a>(
+    segments: impl IntoIterator<Item = &'a PathSegment>,
+    expected: impl AsRef<str>,
+) -> bool {
+    match segments.into_iter().collect::<Vec<_>>().as_slice() {
+        [PathSegment {
+            ident,
+            arguments: PathArguments::None,
+        }] if ident.to_string() == expected.as_ref() => true,
+        _ => false,
     }
 }
 

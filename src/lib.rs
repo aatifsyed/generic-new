@@ -14,24 +14,26 @@
 //!
 //! #[derive(GenericNew)]
 //! struct Foo {
-//!     s: String,     // -> impl AsRef<str>
-//!     v: Vec<usize>, // -> impl IntoIterator<Item = usize>
-//!     p: PathBuf,    // -> impl AsRef<Path>
+//!     s: String,      // -> impl AsRef<str>
+//!     v: Vec<usize>,  // -> impl IntoIterator<Item = usize>
+//!     i: Vec<String>, // -> impl IntoIterator<Item = impl AsRef<str>>
+//!     p: PathBuf,     // -> impl AsRef<Path>
 //!     #[generic_new(ignore)]
-//!     i: String,     // Turn off magic conversion for some fields
+//!     o: String,      // Turn off magic conversion for some fields
 //!     #[generic_new(ty = impl Into<usize>, converter = |u|Into::into(u))]
-//!     u: usize,      // Custom converters are supported
+//!     u: usize,       // Custom converters are supported
 //! }
 //!
 //! # fn _make_foo() {
 //! Foo::new(
 //!     "hello",
 //!     [1, 2, 3],
+//!     ["a", "b", "c"],
 //!     "path/to/foo",
 //!     String::from("world"),
 //!     1u16,
 //! );
-//! 
+//!
 //! # }
 //! ```
 
